@@ -131,35 +131,50 @@ double compute_pi_race_condition(double step){
 	return pi;
 }
 
-double compute_pi_none(double step){
-        int nthreads;
-		struct padded_sum sum[8];
-        
-		omp_set_num_threads(8);
-        double pi = 0.0;
-        
-		#pragma omp parallel 
-        {
-				int i, id, tthreads;
-				double x;
-                tthreads = omp_get_num_threads();
-                id= omp_get_thread_num();
-        
-		        if(id ==0)
-                {
-                        nthreads=tthreads;
-                }
-                for (i=id,sum[id].value = 0.0;i<num_steps;i=i+tthreads){
-                        x = ( i +0.5) * step ;
-                        sum[id].value = sum[id].value + 4.0/(1.0+ x * x ) ;
-                }
+double compute_pi_none(double step) {
+    int nthreads;
+    struct padded_sum sum[NUM_THREADS];
+    double pi = 0.0;
+    int i, id, tthreads;
+    double x;
+
+    omp_set_num_threads(NUM_THREADS);
+
+    #pragma omp parallel private(i, x, id, tthreads)
+    {
+        id = omp_get_thread_num();
+        tthreads = omp_get_num_threads();
+
+        if (id == 0) {
+            nthreads = tthreads;
         }
-	#pragma omp parallel for reduction(+:pi)
-        for ( int i =0; i < nthreads ; i ++){
-                pi += step * sum[i].value;
+
+        // Initialize local sum for each thread
+        sum[id].value = 0.0;
+
+        // Loop unrolling by 4
+        for (i = id; i < num_steps; i += tthreads * 4) {
+            x = (i + 0.5) * step;
+            sum[id].value += 4.0 / (1.0 + x * x);
+
+            x = (i + 1 + 0.5) * step;
+            sum[id].value += 4.0 / (1.0 + x * x);
+
+            x = (i + 2 + 0.5) * step;
+            sum[id].value += 4.0 / (1.0 + x * x);
+
+            x = (i + 3 + 0.5) * step;
+            sum[id].value += 4.0 / (1.0 + x * x);
         }
-        return pi;
-	
+    }
+
+    // Final accumulation
+    #pragma omp parallel for reduction(+:pi)
+    for (i = 0; i < nthreads; i++) {
+        pi += step * sum[i].value;
+    }
+
+    return pi;
 }
 
 /*--------------------------------------------------------------------
