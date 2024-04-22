@@ -8,10 +8,12 @@ It uses the timer from the OpenMP runtime library
 #include <stdlib.h>
 #include <omp.h>
 #define NUM_THREADS 12
+//#pragma GCC optimize("O3")
 double compute_pi_false_sharing(double step);
 double compute_pi_race_condition(double step);
 double compute_pi_none(double step);
 double compute_pi_serial(double step);
+double compute_pi_fast(double step);
 void usage(char prog_name[]);
 static long num_steps = 1000000;
 
@@ -132,6 +134,7 @@ double compute_pi_race_condition(double step){
 }
 
 double compute_pi_none(double step) {
+
     int nthreads;
     struct padded_sum sum[NUM_THREADS];
     double pi = 0.0;
@@ -148,11 +151,9 @@ double compute_pi_none(double step) {
         if (id == 0) {
             nthreads = tthreads;
         }
-
-        // Initialize local sum for each thread
         sum[id].value = 0.0;
 
-        // Loop unrolling by 4
+	#pragma omp for private(x)
         for (i = id; i < num_steps; i += tthreads * 4) {
             x = (i + 0.5) * step;
             sum[id].value += 4.0 / (1.0 + x * x);
@@ -168,13 +169,25 @@ double compute_pi_none(double step) {
         }
     }
 
-    // Final accumulation
     #pragma omp parallel for reduction(+:pi)
     for (i = 0; i < nthreads; i++) {
         pi += step * sum[i].value;
     }
 
     return pi;
+}
+
+double compute_pi_fast(double step){
+	int i;
+	double x, pi, sum = 0.0;
+	#pragma omp parallel for reduction(+:sum) private(x)
+	for (i=0;i<num_steps; i++){
+		x = ( i +0.5) * step ;
+		sum = sum + 4.0/(1.0+ x * x ) ;
+	}
+	pi = step * sum;
+	return pi;
+
 }
 
 /*--------------------------------------------------------------------
