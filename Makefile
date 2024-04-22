@@ -2,7 +2,7 @@
 INC="./inc"
 FLAGS=-I$(INC)
 OMPFLAGS=-fopenmp
-CFLAGS = -g -Wall
+CFLAGS = -g -Wall -pg
 CC=gcc
 CPP=g++
 	

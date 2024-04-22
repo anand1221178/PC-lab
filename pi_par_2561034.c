@@ -45,35 +45,35 @@ int main (int argc, char **argv)
 		start_time = omp_get_wtime();
 		pi=compute_pi_serial(step);
 		run_time += omp_get_wtime() - start_time;
-		time_serial = run_time/iter;
 	}
+	time_serial = run_time/iter;
 	printf("\nSequential : pi with %ld steps is %f in %f seconds\n",num_steps,pi,run_time/iter);
 	//parallel code with false sharing
+	run_time = 0;
 	for(int i=0; i<iter; i++){
 		start_time = omp_get_wtime();
 		pi=compute_pi_false_sharing(step);
 		run_time += omp_get_wtime() - start_time;
-		time_parallel_false_sharing = run_time/iter;
-		speedupCalc = speedup(time_serial, time_parallel_false_sharing);
 	}
+	speedupCalc = speedup(time_serial, run_time/iter);
 	printf("\nParallel with false sharing : pi with %ld steps is %f in %f seconds using %d threads\nSpeedup: %f\n",num_steps,pi,run_time/iter,NUM_THREADS, speedupCalc);
 	//parallel code with race condition
+	run_time = 0;
 	for(int i=0; i<iter; i++){
 		start_time = omp_get_wtime();
 		pi=compute_pi_race_condition(step);
 		run_time += omp_get_wtime() - start_time;
-		time_parallel_race_condition = run_time/iter;
-		speedupCalc = speedup(time_serial, time_parallel_race_condition);
     }
+		speedupCalc = speedup(time_serial, run_time/iter);
         printf("\nParallel with race condition : pi with %ld steps is %f in %f seconds using %d threads\nSpeedup: %f\n",num_steps,pi,run_time/iter,NUM_THREADS, speedupCalc);
 	//parallel code with no race condition and false sharing
+	run_time = 0;
 	for(int i=0; i<iter; i++){
                 start_time = omp_get_wtime();
                 pi=compute_pi_none(step);
                 run_time += omp_get_wtime() - start_time;
-				time_parallel_none = run_time/iter;
-				speedupCalc = speedup(time_serial, time_parallel_none);
         }
+		speedupCalc = speedup(time_serial, run_time/iter);
         printf("\nParallel with no race condition and false sharing : pi with %ld steps is %f in %f seconds using %d threads\nSpeedup: %f\n",num_steps,pi,run_time/iter,NUM_THREADS, speedupCalc);
 }	  
 
@@ -133,15 +133,15 @@ double compute_pi_race_condition(double step){
 
 double compute_pi_none(double step){
         int nthreads;
-		struct padded_sum sum[NUM_THREADS];
+		struct padded_sum sum[8];
         
-		omp_set_num_threads(NUM_THREADS);
+		omp_set_num_threads(8);
         double pi = 0.0;
         
-		#pragma omp parallel reduction(+:pi)
+		#pragma omp parallel 
         {
-                int i, id, tthreads;
-                double x;
+				int i, id, tthreads;
+				double x;
                 tthreads = omp_get_num_threads();
                 id= omp_get_thread_num();
         
@@ -154,7 +154,7 @@ double compute_pi_none(double step){
                         sum[id].value = sum[id].value + 4.0/(1.0+ x * x ) ;
                 }
         }
-	#pragma omp for
+	#pragma omp parallel for reduction(+:pi)
         for ( int i =0; i < nthreads ; i ++){
                 pi += step * sum[i].value;
         }
